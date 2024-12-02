@@ -26,7 +26,8 @@ def main():
     categories = {
         "aggregate_ledger": "metric",
         "tx_type": "type",
-        "tx_result": "result"
+        "tx_result": "result",
+        "amm": "amm"
     }
 
     for category, metric_type in categories.items():

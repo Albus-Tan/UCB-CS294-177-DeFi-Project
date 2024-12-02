@@ -14,6 +14,9 @@ def process_data(data):
     transactions = []
     for account, tx_list in data.items():
         for tx in tx_list:
+            ty = tx.get("TransactionType", "UNKNOWN")
+            if ty != "Payment":
+                continue
             meta = tx.get("meta", {})
             delivered_amount = meta.get("delivered_amount", {}).get("value", 0)
             expected_amount = tx.get("Amount", {}).get("value", 0)
@@ -35,6 +38,7 @@ def process_data(data):
                 "destination": tx.get("Destination"),
                 "currency": currency,
                 "fee_xrp": fee,
+                "fee": int(tx.get("Fee", 0)),
                 "expected_amount": float(expected_amount),
                 "delivered_amount": float(delivered_amount),
                 "slippage_cost_pct": slippage_cost,
@@ -50,20 +54,24 @@ def group_by_month_and_calculate_metrics(df):
     Group the data by month and calculate metrics for each month.
     """
     df["month"] = df["date"].dt.to_period("M")
+    full_month_range = pd.period_range(df["month"].min(), df["month"].max(), freq="M")
+    full_month_df = pd.DataFrame({"month": full_month_range.astype(str)})
 
     grouped = df.groupby("month").agg({
-        "fee_xrp": "mean",  # 平均手续费
+        "fee": "mean",  # 平均手续费
         "slippage_cost_pct": "mean",  # 平均滑点
         "total_cost_currency": "mean",  # 平均总成本
         "hash": "count"  # 每月交易总数
     }).rename(columns={
-        "fee_xrp": "avg_fee_xrp",
+        "fee": "avg_fee",
         "slippage_cost_pct": "avg_slippage_pct",
         "total_cost_currency": "avg_total_cost",
         "hash": "transaction_count"
     }).reset_index()
 
-    return grouped
+    grouped["month"] = grouped["month"].astype(str)
+    full_grouped = full_month_df.merge(grouped, on="month", how="left")
+    return full_grouped
 
 
 def plot_monthly_trends(metrics_df):
@@ -81,17 +89,17 @@ def plot_monthly_trends(metrics_df):
 
     # Average Fee Trend
     plt.subplot(3, 1, 1)
-    plt.plot(metrics_df["month_str"], metrics_df["avg_fee_xrp"], marker="o", label="Average Fee (XRP)", color="blue")
+    plt.plot(metrics_df["month_str"], metrics_df["avg_fee"], marker="o", label="Average Fee", color="blue", linestyle="-")
     plt.title("Average Fee per Month")
     plt.xlabel("Month")
-    plt.ylabel("Average Fee (XRP)")
+    plt.ylabel("Average Fee")
     plt.xticks(ticks=x_ticks, labels=x_labels, rotation=45)
     plt.grid(True)
 
     # Average Slippage Trend
     plt.subplot(3, 1, 2)
     plt.plot(metrics_df["month_str"], metrics_df["avg_slippage_pct"], marker="o", label="Average Slippage (%)",
-             color="green")
+             color="green", linestyle="-")
     plt.title("Average Slippage per Month")
     plt.xlabel("Month")
     plt.ylabel("Average Slippage (%)")
@@ -101,7 +109,7 @@ def plot_monthly_trends(metrics_df):
     # Average Total Cost Trend
     plt.subplot(3, 1, 3)
     plt.plot(metrics_df["month_str"], metrics_df["avg_total_cost"], marker="o", label="Average Total Cost",
-             color="purple")
+             color="purple", linestyle="-")
     plt.title("Average Total Cost per Month")
     plt.xlabel("Month")
     plt.ylabel("Average Total Cost (Currency)")
@@ -119,7 +127,7 @@ def plot_monthly_tx_count(metrics_df):
     plt.figure(figsize=(12, 6))
 
     plt.plot(metrics_df["month"].astype(str), metrics_df["transaction_count"], marker="o", label="Transaction Count",
-             color="orange")
+             color="orange", linestyle="-")
     plt.title("Monthly Transaction Count")
     plt.xlabel("Month")
     plt.ylabel("Transaction Count")
@@ -130,12 +138,12 @@ def plot_monthly_tx_count(metrics_df):
     plt.show()
 
 
-def filter_data_after_2016(df):
-    return df[df["date"] >= datetime(2017, 1, 1)]
+def filter_data_after_2021(df):
+    return df[df["date"] >= datetime(2021, 1, 1)]
 
 
-raw_data = load_json("transactions/Ripple.json")
-processed_df = filter_data_after_2016(process_data(raw_data))
+raw_data = load_json("transactions/UPbit.json")
+processed_df = filter_data_after_2021(process_data(raw_data))
 
 print(processed_df.head())
 monthly_metrics = group_by_month_and_calculate_metrics(processed_df)
