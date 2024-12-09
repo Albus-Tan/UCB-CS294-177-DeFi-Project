@@ -8,6 +8,7 @@ Data Collection
 - `group_well_known_accounts.py`: extract and group well known accounts
 - `collect_tx_data.py`: sample transaction details involving well-known accounts
 - `collect_metrics.py`: collect all on-chain transaction data and calculate metrics
+
 Data collected will be placed as `.json` format in `/transactions` folder under project root.
 
 Data Analysis
